@@ -1,33 +1,34 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI, Request
+import requests
 from moviepy.editor import ImageClip, AudioFileClip
+import uuid
 import os
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
 
-UPLOAD_FOLDER = "./content"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+@app.post("/generate-video")
+async def generate_video(req: Request):
+    data = await req.json()
+    image_url = data["image_url"]
+    audio_url = data["audio_url"]
 
-@app.route("/generate-video", methods=["POST"])
-def generate_video():
-    image = request.files.get("image")
-    audio = request.files.get("audio")
+    # Download image
+    image_path = f"{uuid.uuid4()}.jpg"
+    with open(image_path, "wb") as f:
+        f.write(requests.get(image_url).content)
 
-    if not image or not audio:
-        return jsonify({"error": "Both image and audio are required"}), 400
+    # Download audio
+    audio_path = f"{uuid.uuid4()}.mp3"
+    with open(audio_path, "wb") as f:
+        f.write(requests.get(audio_url).content)
 
-    image_path = os.path.join(UPLOAD_FOLDER, "input.jpg")
-    audio_path = os.path.join(UPLOAD_FOLDER, "input.mp3")
-    video_path = os.path.join(UPLOAD_FOLDER, "output.mp4")
+    # Create video
+    video_path = f"{uuid.uuid4()}.mp4"
+    clip = ImageClip(image_path).set_duration(AudioFileClip(audio_path).duration)
+    clip = clip.set_audio(AudioFileClip(audio_path))
+    clip.write_videofile(video_path, fps=24)
 
-    image.save(image_path)
-    audio.save(audio_path)
+    # For now, return dummy success response
+    return {"status": "success", "video": video_path}
 
-    audio_clip = AudioFileClip(audio_path)
-    image_clip = ImageClip(image_path, duration=audio_clip.duration)
-    video = image_clip.set_audio(audio_clip)
-    video.write_videofile(video_path, fps=24)
 
-    return jsonify({"status": "success", "message": "Video created successfully"})
