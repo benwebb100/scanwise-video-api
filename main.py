@@ -12,6 +12,11 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2 import service_account
+from dotenv import load_dotenv
+import gc
+
+# Load environment variables
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,15 +24,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Video Generation API")
 
-# Ensure temp directory exists
-os.makedirs("temp", exist_ok=True)
-
+# Constants
+TEMP_DIR = "video_temp"
+MAX_FILE_SIZE_MB = 100
 SUPPORTED_IMAGE_FORMATS = ['jpg', 'jpeg', 'png', 'bmp', 'gif', 'webp']
 SUPPORTED_AUDIO_FORMATS = ['mp3', 'wav', 'aac', 'm4a', 'ogg']
 
-# Google Drive setup
+# Create temp directories
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Google Drive setup from environment variables
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
-SERVICE_ACCOUNT_FILE = 'service_account.json'
 
 # Format mapping
 MIME_TO_FORMAT = {
@@ -44,8 +51,34 @@ MIME_TO_FORMAT = {
     'audio/ogg': 'ogg'
 }
 
+def check_file_size(file_path: str, max_size_mb: int = MAX_FILE_SIZE_MB):
+    """Check if file size is within limits"""
+    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if size_mb > max_size_mb:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large: {size_mb:.2f}MB (max {max_size_mb}MB)"
+        )
+
 def get_credentials_dict():
     """Create credentials dictionary from environment variables"""
+    required_creds = [
+        "GOOGLE_TYPE",
+        "GOOGLE_PROJECT_ID",
+        "GOOGLE_PRIVATE_KEY_ID",
+        "GOOGLE_PRIVATE_KEY",
+        "GOOGLE_CLIENT_EMAIL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_AUTH_URI",
+        "GOOGLE_TOKEN_URI",
+        "GOOGLE_AUTH_PROVIDER_X509_CERT_URL",
+        "GOOGLE_CLIENT_X509_CERT_URL"
+    ]
+    
+    missing = [cred for cred in required_creds if not os.getenv(cred)]
+    if missing:
+        raise ValueError(f"Missing required credentials: {', '.join(missing)}")
+
     return {
         "type": os.getenv("GOOGLE_TYPE"),
         "project_id": os.getenv("GOOGLE_PROJECT_ID"),
@@ -60,28 +93,14 @@ def get_credentials_dict():
     }
 
 def get_google_drive_service():
-    """Get Google Drive service using service account"""
+    """Get Google Drive service using credentials from environment variables"""
     try:
-
         credentials_dict = get_credentials_dict()
-        
-        # Validate required credentials
-        required_fields = ["type", "project_id", "private_key_id", "private_key", "client_email"]
-        missing_fields = [field for field in required_fields if not credentials_dict.get(field)]
-        
-        if missing_fields:
-            raise ValueError(f"Missing required credentials: {', '.join(missing_fields)}")
-        
-        # credentials = service_account.Credentials.from_service_account_file(
-        #     SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
         credentials = service_account.Credentials.from_service_account_info(
             credentials_dict,
             scopes=SCOPES
         )
-        
-        service = build('drive', 'v3', credentials=credentials)
-        return service
+        return build('drive', 'v3', credentials=credentials)
     except Exception as e:
         logger.error(f"Error setting up Google Drive service: {str(e)}")
         raise
@@ -130,16 +149,13 @@ def upload_to_drive(file_path: str, mime_type: str = 'video/mp4') -> dict:
 
 def detect_format(content_type: str, url: str, is_audio: bool = False) -> str:
     """Detect format from content type or URL"""
-    # Get format from MIME mapping
     format_ext = MIME_TO_FORMAT.get(content_type.lower())
     
     if not format_ext:
-        # Try to get extension from URL
         ext = url.split('.')[-1].lower()
         if ext in SUPPORTED_IMAGE_FORMATS or ext in SUPPORTED_AUDIO_FORMATS:
             format_ext = ext
         else:
-            # Default fallbacks
             format_ext = 'mp3' if is_audio else 'jpg'
     
     return format_ext
@@ -150,10 +166,7 @@ def download_file(url: str, is_audio: bool = False) -> tuple[bytes, str]:
         response = requests.get(url, stream=True)
         response.raise_for_status()
         
-        # Get content type from response headers
         content_type = response.headers.get('content-type', '')
-        
-        # Detect format using the new function
         format_ext = detect_format(content_type, url, is_audio)
         
         logger.info(f"Detected format: {format_ext} from content-type: {content_type}")
@@ -171,10 +184,7 @@ async def generate_video(
     audio_url: str = Form(...),
     duration: Optional[float] = Form(5.0)
 ):
-    """
-    Generate video from image and audio URLs.
-    Expects Google Drive download URLs.
-    """
+    """Generate video from image and audio URLs"""
     
     timestamp = int(time.time())
     temp_files = []
@@ -201,9 +211,9 @@ async def generate_video(
             )
 
         # Create temporary file paths
-        image_path = f"temp/temp_image_{timestamp}.{image_format}"
-        audio_path = f"temp/temp_audio_{timestamp}.{audio_format}"
-        video_path = f"temp/output_video_{timestamp}.mp4"
+        image_path = os.path.join(TEMP_DIR, f"temp_image_{timestamp}.{image_format}")
+        audio_path = os.path.join(TEMP_DIR, f"temp_audio_{timestamp}.{audio_format}")
+        video_path = os.path.join(TEMP_DIR, f"output_video_{timestamp}.mp4")
         
         temp_files.extend([image_path, audio_path, video_path])
 
@@ -213,6 +223,17 @@ async def generate_video(
         
         with open(audio_path, 'wb') as f:
             f.write(audio_data)
+
+        # Check file sizes
+        check_file_size(image_path)
+        check_file_size(audio_path)
+
+        # Verify files exist
+        if not os.path.exists(image_path) or not os.path.exists(audio_path):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save temporary files"
+            )
 
         # Create video using moviepy
         image_clip = None
@@ -229,16 +250,32 @@ async def generate_video(
             
             final_clip = image_clip.with_audio(audio_clip)
             
-            final_clip.write_videofile(
-                video_path,
-                fps=24,
-                codec='libx264',
-                audio_codec='aac'
-            )
+            # Write video with improved parameters
+            try:
+                logger.info("Writing video file...")
+                final_clip.write_videofile(
+                    video_path,
+                    fps=24,
+                    codec='libx264',
+                    audio_codec='aac',
+                    threads=4,
+                    preset='ultrafast',
+                    ffmpeg_params=['-strict', '-2', '-bufsize', '2000k'],
+                    logger=None
+                )
+            except Exception as video_error:
+                logger.error(f"Error writing video: {str(video_error)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error writing video: {str(video_error)}"
+                )
             
             # Upload to Google Drive
             logger.info("Uploading video to Google Drive...")
             drive_links = upload_to_drive(video_path)
+            
+            # Clean up memory
+            gc.collect()
             
             return {
                 "status": "success",
@@ -253,10 +290,18 @@ async def generate_video(
             }
             
         finally:
-            if image_clip: image_clip.close()
-            if audio_clip: audio_clip.close()
+            if image_clip: 
+                try:
+                    image_clip.close()
+                except:
+                    pass
+            if audio_clip: 
+                try:
+                    audio_clip.close()
+                except:
+                    pass
             
-            # Clean up all temporary files
+            # Clean up temporary files
             for file_path in temp_files:
                 try:
                     if os.path.exists(file_path):
@@ -286,4 +331,6 @@ async def get_supported_formats():
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv('API_PORT', 8000))
+    host = os.getenv('API_HOST', '0.0.0.0')
+    uvicorn.run(app, host=host, port=port)
