@@ -63,16 +63,16 @@ def check_file_size(file_path: str, max_size_mb: int = MAX_FILE_SIZE_MB):
 def get_credentials_dict():
     """Create credentials dictionary from environment variables"""
     required_creds = [
-        "GOOGLE_TYPE",
-        "GOOGLE_PROJECT_ID",
-        "GOOGLE_PRIVATE_KEY_ID",
-        "GOOGLE_PRIVATE_KEY",
-        "GOOGLE_CLIENT_EMAIL",
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_AUTH_URI",
-        "GOOGLE_TOKEN_URI",
-        "GOOGLE_AUTH_PROVIDER_X509_CERT_URL",
-        "GOOGLE_CLIENT_X509_CERT_URL"
+        "TYPE",  # Changed from GOOGLE_TYPE
+        "PROJECT_ID",  # Changed from GOOGLE_PROJECT_ID
+        "PRIVATE_KEY_ID",  # Changed from GOOGLE_PRIVATE_KEY_ID
+        "PRIVATE_KEY",  # Changed from GOOGLE_PRIVATE_KEY
+        "CLIENT_EMAIL",  # Changed from GOOGLE_CLIENT_EMAIL
+        "CLIENT_ID",  # Changed from GOOGLE_CLIENT_ID
+        "AUTH_URI",  # Changed from GOOGLE_AUTH_URI
+        "TOKEN_URI",  # Changed from GOOGLE_TOKEN_URI
+        "AUTH_PROVIDER_X509_CERT_URL",  # Changed from GOOGLE_AUTH_PROVIDER_X509_CERT_URL
+        "CLIENT_X509_CERT_URL"  # Changed from GOOGLE_CLIENT_X509_CERT_URL
     ]
     
     missing = [cred for cred in required_creds if not os.getenv(cred)]
@@ -80,16 +80,16 @@ def get_credentials_dict():
         raise ValueError(f"Missing required credentials: {', '.join(missing)}")
 
     return {
-        "type": os.getenv("GOOGLE_TYPE"),
-        "project_id": os.getenv("GOOGLE_PROJECT_ID"),
-        "private_key_id": os.getenv("GOOGLE_PRIVATE_KEY_ID"),
-        "private_key": os.getenv("GOOGLE_PRIVATE_KEY"),
-        "client_email": os.getenv("GOOGLE_CLIENT_EMAIL"),
-        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-        "auth_uri": os.getenv("GOOGLE_AUTH_URI"),
-        "token_uri": os.getenv("GOOGLE_TOKEN_URI"),
-        "auth_provider_x509_cert_url": os.getenv("GOOGLE_AUTH_PROVIDER_X509_CERT_URL"),
-        "client_x509_cert_url": os.getenv("GOOGLE_CLIENT_X509_CERT_URL")
+        "type": os.getenv("TYPE"),
+        "project_id": os.getenv("PROJECT_ID"),
+        "private_key_id": os.getenv("PRIVATE_KEY_ID"),
+        "private_key": os.getenv("PRIVATE_KEY"),
+        "client_email": os.getenv("CLIENT_EMAIL"),
+        "client_id": os.getenv("CLIENT_ID"),
+        "auth_uri": os.getenv("AUTH_URI"),
+        "token_uri": os.getenv("TOKEN_URI"),
+        "auth_provider_x509_cert_url": os.getenv("AUTH_PROVIDER_X509_CERT_URL"),
+        "client_x509_cert_url": os.getenv("CLIENT_X509_CERT_URL")
     }
 
 def get_google_drive_service():
