@@ -2,7 +2,6 @@ from fastapi import HTTPException, Form, APIRouter
 import os
 import time
 import gc
-from typing import Optional
 import config
 from utils.logging_setup import logger
 from utils.file_handler import download_file, check_file_size, clean_temp_files
@@ -15,8 +14,7 @@ router = APIRouter()
 @router.post("/generate-video")
 async def generate_video(
     image_url: str = Form(...),
-    audio_url: str = Form(...),
-    duration: Optional[float] = Form(5.0)
+    audio_url: str = Form(...)
 ):
     """Generate video from image and audio URLs"""
     
@@ -70,7 +68,7 @@ async def generate_video(
             )
 
         # Create video
-        final_duration = create_video(image_path, audio_path, video_path, duration)
+        final_duration = create_video(image_path, audio_path, video_path)
         
         # Upload to Google Drive
         logger.info("Uploading video to Google Drive...")
