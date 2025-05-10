@@ -29,3 +29,4 @@ uvicorn==0.34.2
 google-auth-oauthlib 
 google-auth-httplib2 
 google-api-python-client 
+openai-whisper==20240930
