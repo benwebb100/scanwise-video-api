@@ -30,3 +30,4 @@ openai-whisper==20240930
 google-auth-oauthlib 
 google-auth-httplib2 
 google-api-python-client 
+openai-whisper==20240930
