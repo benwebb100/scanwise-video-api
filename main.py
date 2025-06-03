@@ -4,6 +4,7 @@ import os
 
 from routes.generate_video import router as generate_video_router
 from routes.base64 import router as hex_to_base64_router
+from routes.generate_avatar_video import router as generate_avatar_video_router
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -15,6 +16,7 @@ app = FastAPI(
 # Import routes
 app.include_router(generate_video_router)
 app.include_router(hex_to_base64_router)
+app.include_router(generate_avatar_video_router)
 
 
 @app.get("/")
