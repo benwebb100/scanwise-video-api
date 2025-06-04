@@ -13,18 +13,66 @@ def check_file_size(file_path: str, max_size_mb: int = MAX_FILE_SIZE_MB):
             detail=f"File too large: {size_mb:.2f}MB (max {max_size_mb}MB)"
         )
 
+# def detect_format(content_type: str, url: str, is_audio: bool = False) -> str:
+#     """Detect format from content type or URL"""
+#     format_ext = MIME_TO_FORMAT.get(content_type.lower())
+    
+#     if not format_ext:
+#         ext = url.split('.')[-1].lower()
+#         if ext in SUPPORTED_IMAGE_FORMATS or ext in SUPPORTED_AUDIO_FORMATS:
+#             format_ext = ext
+#         else:
+#             format_ext = 'mp3' if is_audio else 'jpg'
+    
+#     return format_ext
+
 def detect_format(content_type: str, url: str, is_audio: bool = False) -> str:
-    """Detect format from content type or URL"""
-    format_ext = MIME_TO_FORMAT.get(content_type.lower())
+    """Detect file format from content-type or URL"""
     
-    if not format_ext:
-        ext = url.split('.')[-1].lower()
-        if ext in SUPPORTED_IMAGE_FORMATS or ext in SUPPORTED_AUDIO_FORMATS:
-            format_ext = ext
-        else:
-            format_ext = 'mp3' if is_audio else 'jpg'
+    # First, try to detect from content-type
+    content_type = content_type.lower()
     
-    return format_ext
+    # Video formats
+    if 'video/mp4' in content_type:
+        return 'mp4'
+    elif 'video/quicktime' in content_type:
+        return 'mov'
+    elif 'video/x-msvideo' in content_type:
+        return 'avi'
+    elif 'video/x-matroska' in content_type:
+        return 'mkv'
+    
+    # Image formats
+    elif 'image/jpeg' in content_type or 'image/jpg' in content_type:
+        return 'jpg'
+    elif 'image/png' in content_type:
+        return 'png'
+    elif 'image/gif' in content_type:
+        return 'gif'
+    elif 'image/webp' in content_type:
+        return 'webp'
+    
+    # Audio formats
+    elif 'audio/mpeg' in content_type or 'audio/mp3' in content_type:
+        return 'mp3'
+    elif 'audio/wav' in content_type or 'audio/x-wav' in content_type:
+        return 'wav'
+    elif 'audio/mp4' in content_type or 'audio/m4a' in content_type:
+        return 'm4a'
+    elif 'audio/aac' in content_type:
+        return 'aac'
+    
+    # If content-type detection fails, try URL extension
+    if '.' in url:
+        ext = url.split('.')[-1].split('?')[0].lower()
+        if ext in ['mp4', 'mov', 'avi', 'mkv', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'm4a', 'aac']:
+            return ext
+    
+    # Default fallback based on context
+    if is_audio:
+        return 'mp3'  # Default audio format
+    else:
+        return 'jpg'  # Default image format
 
 def download_file(url: str, is_audio: bool = False) -> tuple[bytes, str]:
     """Download file from URL and detect its format"""

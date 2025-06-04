@@ -109,12 +109,16 @@ async def get_supported_formats():
     }
 
 
+# Pydantic model for prefix video request
+from pydantic import BaseModel
+class VideoWithPrefixRequest(BaseModel):
+    image_url: str
+    audio_url: str
+    prefix_video_url: str
+
+
 @router.post("/generate-video-with-prefix")
-async def generate_video_with_prefix(
-    image_url: str = Form(...),
-    audio_url: str = Form(...),
-    prefix_video_url: str = Form(...)
-):
+async def generate_video_with_prefix(request: VideoWithPrefixRequest):
     """Generate video from image and audio URLs with a prefix video"""
     
     timestamp = int(time.time())
@@ -123,7 +127,7 @@ async def generate_video_with_prefix(
     try:
         # Download prefix video from Google Drive
         logger.info("Downloading prefix video...")
-        prefix_video_data, prefix_format = download_file(prefix_video_url, is_audio=False)
+        prefix_video_data, prefix_format = download_file(request.prefix_video_url, is_audio=False)
         
         # Validate prefix video format
         if prefix_format not in ['mp4', 'mov', 'avi', 'mkv']:
@@ -134,10 +138,10 @@ async def generate_video_with_prefix(
         
         # Download files and detect formats
         logger.info("Downloading image...")
-        image_data, image_format = download_file(image_url, is_audio=False)
+        image_data, image_format = download_file(request.image_url, is_audio=False)
         
         logger.info("Downloading audio...")
-        audio_data, audio_format = download_file(audio_url, is_audio=True)
+        audio_data, audio_format = download_file(request.audio_url, is_audio=True)
         
         # Validate formats
         if image_format not in config.SUPPORTED_IMAGE_FORMATS:

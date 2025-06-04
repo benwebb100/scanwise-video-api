@@ -34,6 +34,6 @@ def get_version():
 # Main entry point
 # to run the FastAPI app
 if __name__ == "__main__":
-    port = int(os.getenv('API_PORT', 8000))
+    port = int(os.getenv('API_PORT', 8001))
     host = os.getenv('API_HOST', '0.0.0.0')
     uvicorn.run(app, host=host, port=port)
